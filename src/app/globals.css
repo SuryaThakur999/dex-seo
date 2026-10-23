@@ -1,0 +1,404 @@
+@import "tailwindcss";
+@import '@fontsource/fira-sans/400.css';
+@import '@fontsource/fira-sans/500.css';
+@import '@fontsource/fira-sans/600.css';
+@import '@fontsource/fira-code/400.css';
+@import '@fontsource/fira-code/500.css';
+@import '@fontsource/fira-code/600.css';
+@import '@fontsource/vt323/400.css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0F172A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #334155;
+  --secondary-foreground: #FFFFFF;
+  --muted: #E8ECF1;
+  --muted-foreground: #64748B;
+  --accent: #C2410C;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0F172A;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-mono: 'Fira Code', monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Dex marketing site tokens — scoped to the public homepage only, does not touch the
+   authenticated app's light theme above. Applied alongside .dark on the homepage root. */
+.dex-marketing {
+  --dex-bg: #0b0b0f;
+  --dex-bg-elevated: #15151b;
+  --dex-bg-elevated-2: #1d1d24;
+  --dex-text-primary: #f4f4f6;
+  --dex-text-secondary: #9a9aa5;
+  --dex-text-tertiary: #5a5a66;
+  --dex-accent: #ff4d2e;
+  --dex-accent-secondary: #ffb020;
+  --dex-border: #232329;
+  --dex-border-accent: rgba(255, 77, 46, 0.4);
+  --dex-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  font-family: 'Geist Variable', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Website only: Geist for text, Geist Mono for the terminal and code. The signed-in app keeps
+   Fira Sans. Tracking tightens as text grows (Apple's size-specific tracking). */
+.dex-marketing code,
+.dex-marketing pre,
+.dex-marketing kbd,
+.dex-marketing .font-mono {
+  font-family: 'Geist Mono Variable', ui-monospace, monospace;
+}
+
+.dex-marketing h1 {
+  letter-spacing: -0.035em;
+}
+
+/* One type scale for the whole homepage, modelled on Apple's marketing pages: a fluid display
+   headline per section, one lead sentence, 16-17px body, 13px labels. Sections use these
+   classes instead of per-section text sizes so every chapter reads at the same rhythm. */
+.dex-marketing .dex-h2 {
+  font-size: clamp(2.25rem, 1.6rem + 2.8vw, 3.5rem);
+  line-height: 1.07;
+  letter-spacing: -0.03em;
+  font-weight: 650;
+  text-wrap: balance;
+  color: var(--dex-text-primary);
+}
+
+.dex-marketing .dex-h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--dex-text-primary);
+}
+
+.dex-marketing .dex-h3.dex-h3-lg {
+  font-size: clamp(1.375rem, 1.1rem + 0.9vw, 1.75rem);
+  line-height: 1.18;
+  letter-spacing: -0.018em;
+}
+
+.dex-marketing .dex-lead {
+  font-size: clamp(1.0625rem, 0.95rem + 0.5vw, 1.3125rem);
+  line-height: 1.5;
+  max-width: 38rem;
+  text-wrap: pretty;
+  color: var(--dex-text-secondary);
+}
+
+.dex-marketing .dex-body {
+  font-size: 1rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+  color: var(--dex-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .dex-marketing .dex-body {
+    font-size: 1.0625rem;
+  }
+}
+
+.dex-marketing .dex-label {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Same breathing room on every chapter. */
+.dex-marketing .dex-section {
+  padding: clamp(6rem, 4rem + 8vw, 10rem) 1rem;
+}
+
+@media (min-width: 640px) {
+  .dex-marketing .dex-section {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Anchor jumps from the nav and dock land below the floating nav, not under it. */
+.dex-marketing section[id] {
+  scroll-margin-top: 5rem;
+}
+
+/* Shared card hover: a 2px lift and a brighter edge. Mouse only, so taps on phones never
+   leave a card stuck in its hover state. Existing per-card motion hovers stay as they are. */
+.dex-marketing .dex-card {
+  transition:
+    transform 200ms var(--dex-ease-out),
+    border-color 200ms var(--dex-ease-out),
+    box-shadow 200ms var(--dex-ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dex-marketing .dex-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--dex-border-accent);
+    box-shadow: 0 20px 40px -24px rgba(255, 77, 46, 0.3);
+  }
+}
+
+/* Every primary button presses the same way. */
+.dex-marketing .dex-press {
+  transition: transform 160ms var(--dex-ease-out), background-color 160ms var(--dex-ease-out);
+}
+
+.dex-marketing .dex-press:active {
+  transform: scale(0.97);
+}
+
+.dex-marketing :focus-visible {
+  outline: 2px solid var(--dex-accent);
+  outline-offset: 3px;
+}
+
+/* "Precision instrument" dark theme — see docs/superpowers/specs/2026-09-09-dex-signal-room-design.md
+   for the contrast verification table and the two corrections applied below.
+   Theme resolution: next-themes puts .light/.dark on <html>; these are descendant
+   selectors so the app shell (.dex-app, mounted once per layout) never needs to know
+   which theme is active — pure CSS cascade, no JS-conditioned className. */
+html.dark .dex-app {
+  --background: #111310; /* Canvas */
+  --foreground: #F1EBDD; /* Primary text — 15.7:1 on Canvas */
+  --card: #1A1D18; /* Surface */
+  --card-foreground: #F1EBDD;
+  --popover: #1A1D18;
+  --popover-foreground: #F1EBDD;
+  --border: #34392F; /* subtle/hairline only — fails 3:1, never used for functional boundaries */
+  --input: #4A5142; /* border-strong — functional input/interactive outlines */
+  --ring: #FF965A; /* focus rings always use accent directly, never a border token */
+  --primary: #F1EBDD;
+  --primary-foreground: #111310;
+  --muted: #242820; /* Raised */
+  --muted-foreground: #B4B7AA; /* Secondary text — 9.2:1 on Canvas */
+  --accent: #FF965A;
+  --accent-foreground: #000000; /* Ink — accent fill only passes (9.8:1) with dark text, never light */
+  --destructive: #ED9290;
+  --destructive-foreground: #000000; /* same fill-contrast rule applied to the destructive fill */
+
+  --dex-app-border-strong: #4A5142;
+  --dex-app-ink: #000000;
+  --dex-app-bg-elevated-2: #242820;
+  --dex-app-amber: #E8C16A;
+  --dex-app-success: #A8C98A; /* Positive */
+  --dex-app-success-bg: rgba(168, 201, 138, 0.14);
+  --dex-app-warning: #E8C16A; /* Warning */
+  --dex-app-warning-bg: rgba(232, 193, 106, 0.14);
+  --dex-app-danger: #ED9290; /* Negative */
+  --dex-app-danger-bg: rgba(237, 146, 144, 0.14);
+
+  /* Categorical chart series (Analytics: Finding mix donut, etc.) — fixed order, never
+   * cycled. Validated via the dataviz skill's validate_palette.js against this exact dark
+   * surface (#1A1D18): lightness band, chroma floor, CVD adjacent-pair ΔE>=8, normal-vision
+   * floor ΔE>=15, contrast>=3:1 all PASS. Distinct from --accent (orange, UI chrome) even
+   * though slot 2 is also an orange family — different context (legend swatch vs chrome). */
+  --dex-app-chart-1: #3987e5; /* blue */
+  --dex-app-chart-2: #d95926; /* orange */
+  --dex-app-chart-3: #199e70; /* aqua/green */
+  --dex-app-chart-4: #c98500; /* yellow */
+  --dex-app-chart-5: #d55181; /* magenta */
+  --dex-app-chart-6: #008300; /* green */
+}
+
+/* Warm neutral light counterpart. The terminal and monospace activity surfaces
+   intentionally stay dark even in Light mode (kept via .dex-app-terminal below) — a
+   light-mode terminal reads as a broken/empty console, not as Dex's identity. Orange
+   accent's fill-text pairing re-verified per theme, not copied from dark mode: black
+   text on dark mode's #FF965A passes at 9.8:1, but white text on light mode's darker
+   #C2410C is what actually clears 4.5:1 here — the two themes need opposite fill-text
+   choices, not the same one. */
+html.light .dex-app {
+  --background: #FAF8F3; /* warm off-white, not clinical white */
+  --foreground: #1C1A15; /* Primary text — >15:1 on background */
+  --card: #FFFFFF;
+  --card-foreground: #1C1A15;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1A15;
+  --border: #E5E0D4; /* hairline only, same rule as dark: never a functional boundary */
+  --input: #C9C2AE; /* border-strong */
+  --ring: #C2410C;
+  --primary: #1C1A15;
+  --primary-foreground: #FAF8F3;
+  --muted: #F0ECE1;
+  --muted-foreground: #5C5648; /* Secondary text — 7.7:1 on background */
+  --accent: #C2410C; /* controlled orange — darker than dark-mode's #FF965A so it stays legible on light surfaces */
+  --accent-foreground: #FFFFFF;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+
+  --dex-app-border-strong: #C9C2AE;
+  --dex-app-ink: #FFFFFF;
+  --dex-app-bg-elevated-2: #F0ECE1;
+  --dex-app-amber: #92660B;
+  --dex-app-success: #2E7D46;
+  --dex-app-success-bg: rgba(46, 125, 70, 0.1);
+  --dex-app-warning: #92660B;
+  --dex-app-warning-bg: rgba(146, 102, 11, 0.1);
+  --dex-app-danger: #B91C1C;
+  --dex-app-danger-bg: rgba(185, 28, 28, 0.1);
+
+  /* Same categorical series as dark mode, re-stepped for the light surface (#FFFFFF) —
+   * validated PASS on lightness/chroma/CVD/normal-vision; 3 slots read below 3:1 contrast
+   * (documented WARN in the validator, legal only with relief), so every categorical chart
+   * using these ships a visible direct-label legend, never color-only identity. */
+  --dex-app-chart-1: #2a78d6; /* blue */
+  --dex-app-chart-2: #eb6834; /* orange */
+  --dex-app-chart-3: #1baf7a; /* aqua/green */
+  --dex-app-chart-4: #eda100; /* yellow */
+  --dex-app-chart-5: #e87ba4; /* magenta */
+  --dex-app-chart-6: #008300; /* green */
+}
+
+/* Terminal-family surfaces (ScanTerminal, the Live Activity card body) keep the dark
+   "precision instrument" look in both themes — see comment above. Opt in per-component
+   via this class rather than a blanket override, so cards around the terminal (Site
+   Brief, findings) still follow the active theme normally. */
+html.light .dex-app-terminal {
+  --background: #111310;
+  --foreground: #F1EBDD;
+  --card: #1A1D18;
+  --card-foreground: #F1EBDD;
+  --border: #34392F;
+  --muted-foreground: #B4B7AA;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dex-app *,
+  .dex-app *::before,
+  .dex-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduced-motion safety net for the marketing homepage. The section components already
+   gate their scroll/entrance choreography per-instance via useReducedMotion, but several
+   hover/press states (card lifts, link underlines, icon nudges) are plain CSS transitions
+   rather than motion.* props, so they wouldn't otherwise respect the OS setting. This
+   collapses any remaining CSS transition/animation to effectively instant without touching
+   Framer Motion's own animations, which run on transform/opacity via JS, not CSS
+   transition-duration. */
+@media (prefers-reduced-motion: reduce) {
+  .dex-marketing *,
+  .dex-marketing *::before,
+  .dex-marketing *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Fira Sans', system-ui, sans-serif;
+}
+
+/* Apple-design "Materials & depth": floating chrome over scrolling content reads as a
+   translucent material, not an opaque bar. color-mix() against --card keeps it correct
+   in both light and dark dex-app themes without a duplicate rgba per theme. */
+.dex-glass {
+  background-color: color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .dex-glass {
+    background-color: var(--card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Same blur, but for interactive controls that already carry their own tint color (buttons) --
+   the element itself supplies a translucent bg color utility (e.g. bg-accent slash 85), keeping
+   each variant's real color instead of a neutral --card wash; this class only adds the
+   blur/border. Text stays on the solid foreground color, never on the translucent layer itself,
+   so contrast is unaffected -- apple-design's "vibrancy" rule: put color on a solid layer, not
+   the translucent foreground. */
+.dex-glass-btn {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .dex-glass-btn {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+code, pre, kbd {
+  font-family: 'Fira Code', monospace;
+}
+
+@keyframes stat-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stat-card-in {
+  animation: stat-card-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-stat-card-in {
+    animation: none;
+    opacity: 1;
+  }
+}

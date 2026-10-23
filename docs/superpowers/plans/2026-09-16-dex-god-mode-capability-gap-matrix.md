@@ -1,0 +1,34 @@
+# DEX GOD MODE — Capability-Gap Matrix
+
+Directive step 1-2 output: "Begin now with repository inspection and the agent capability-gap matrix." Full directive at `docs/superpowers/specs/2026-09-16-dex-god-mode-agent-council-directive.md` — read that before continuing this initiative; this file is the inspection result only, not a re-statement of the directive.
+
+Method: direct source inspection (`src/lib/audit-agents/*.ts`, `src/lib/proof-layer.ts`, `src/lib/opportunity-board.ts`, `src/lib/run-scan.ts`, `prisma/schema.prisma`), not assumed from memory or prior docs.
+
+## Per-agent status
+
+| Agent | Status | Real evidence |
+|---|---|---|
+| Technical SEO Specialist | **working, partial** | `seo-specialist.ts`, 6 real rules (canonical ×3, structured data, internal links, status code). Pure function, no harness/versioning object. |
+| GEO/AI Discoverability Specialist | **working, partial** | `geo-specialist.ts`, 2 real rules (AI-crawler robots block, homepage entity markup). Already correctly distinguishes "observed fact" from "measured AI visibility" in its own limitations text. |
+| Brand and Content Specialist | **working, partial** | `brand-specialist.ts`, 1 real rule (unverified claim vs. approved `CustomerFact`). **Gap found this pass:** `restrictedWording` (ClientProfile field) is fetched and passed to ProofLayer for draft validation (`run-scan.ts:393`) but never passed to `runBrandSpecialist` — so existing page copy is never checked against a customer's own restricted-wording list, only newly generated drafts are. |
+| Regional Market Strategist | **correctly `blocked_by_dependency`** | Zero regional/locale infrastructure exists anywhere (confirmed: no `market`/`language` field on `Finding`, no knowledge-pack model, no per-locale evidence path). Matches the directive's own instruction to keep this blocked until Phase 6. |
+| Native-Language Editor | **correctly `blocked_by_dependency`** | Same root cause as above — no locale-aware evidence to edit against. |
+| ProofLayer Validator | **working** | `proof-layer.ts`, 5 real checks (AI disclosure, unverifiable claims, contradictions, length/format, duplicate content), used in both `run-scan.ts` and Content Studio's generation path. Not wrapped in any agent-harness/circuit-breaker concept — plain function. |
+| Growth Orchestrator | **working, partial** | `computeOpportunityGroups` (opportunity-board.ts) does real template-level duplicate grouping, but **only within one `ruleId`** — no cross-agent semantic-duplicate detection. Concrete real overlap found this pass: on a homepage with zero JSON-LD, SEO Specialist's `missing_structured_data` and GEO Specialist's `missing_entity_markup` both fire for the same underlying fact, shown as two separate findings today. No conflict-detection mechanism, no decision-record structure, no prioritization beyond severity sort. |
+| Knowledge Steward | **missing entirely** | No source registry, no scheduled fetch, no knowledge-pack model, no candidate/approval pipeline. Complete greenfield build — the largest single gap in the council. |
+
+## Cross-cutting infrastructure gaps (affect every agent equally)
+
+- **No agent harness/versioned "brain" object anywhere.** Every agent today is a stateless pure function called inline from `run-scan.ts`. None of Section 3's required fields exist: stable agent ID, timeout, retry limit, token budget, model-routing policy, prompt/skill-manifest/policy/knowledge-pack/eval-set version, failure history, circuit-breaker state, last-known-good config, rollback target.
+- **No survival-gate lifecycle.** `ScanJob.status` is a simple `queued|running|completed|failed|cancelled` string — nothing resembling `validating_input → validating_output → degraded → quarantined → rolled_back → replaced` exists at any layer. Zero agent failures have ever been quarantined in this system's history (there's no mechanism to record one).
+- **No normalized output schema.** `Finding` has `agent, ruleId, ruleVersion, severity, confidence, evidence, limitations, suggestedAction` — real, but missing every field Section 7 requires beyond that: rationale, citations, language, market, model version, prompt version, skill-manifest version, knowledge-pack version.
+- **No token/cost governance layer.** Confirmed in this project's own progress doc (Phase 9, already flagged separately as unbuilt): draft generation relies on the OpenAI SDK's own `maxRetries: 1` default. No persistent queue, no `Retry-After` handling, no circuit breaker, no per-agent cost ceiling anywhere. Section 13 cannot be real without Phase 9 existing first.
+- **No GitHub-skill-discovery/manifest system.** This would be a genuinely new architecture pattern for this codebase: Dex is a synchronous Next.js/Vercel backend, not a Claude Code agent runtime — there is no existing mechanism by which a Claude Code Skill (a Markdown instruction package for an LLM chat session) could be "installed" and invoked by a Node.js audit function at scan time. Sections 4-5 as literally written describe wiring the Claude Code skill ecosystem into Dex's own production backend, which is architecturally unprecedented here and needs an explicit design decision before any GitHub search or manifest-writing is meaningful.
+
+## Recommendation (Agent A proposal, per the directive's own step 1 — "propose the smallest complete architecture")
+
+Building the full Section 3 harness (circuit breakers, quarantine states, rollback targets, GitHub-sourced skill manifests) for 4 stateless pure functions that have never once failed in production is disproportionate to Dex's actual current scale and history — there is no real failure population to justify a quarantine/rollback system yet, and no precedent anywhere in this codebase for installing external Claude Skills into a runtime Node.js function.
+
+Smallest complete version that is still real (not hollow): a lightweight versioned `AgentDescriptor` metadata object per existing agent (id, role, ruleVersion, real capability list) attached to output at write time — satisfying Section 7's identity/version fields honestly — without inventing circuit-breaker/quarantine mechanics that have no failures to contain yet. The Growth Orchestrator's cross-ruleId duplicate-consolidation gap (the one concrete overlap found above) is buildable now with zero new infrastructure. Knowledge Steward and the full skill-manifest/GitHub-discovery apparatus are both real, large, standalone builds that should be scoped and confirmed as their own units, not folded into a "smallest complete architecture" pass.
+
+This is the point in the directive's own loop ("Agent B challenges unsupported assumptions and unnecessary complexity... Record the decision") where a human call is the correct next step given how large the divergence is between the directive's literal ask and what's proportionate to build right now.

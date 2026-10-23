@@ -1,0 +1,14 @@
+node_modules
+.next
+.env*
+!.env.example
+*.tsbuildinfo
+.gstack/
+.DS_Store
+.vercel
+.firecrawl/
+
+.worktrees/
+
+# SQLite artifact left by test runs
+:memory:.ses

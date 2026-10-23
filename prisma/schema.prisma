@@ -1,0 +1,831 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Workspace-wide Crawl Runner preference (DEX CONTINUATION MASTER DIRECTIVE Phase 4/Settings):
+// 'disabled' is the literal "workspace-level enterprise disable control" — no separate plan
+// gate exists (Customer.plan has no real enterprise/free differentiation today), so this one
+// setting serves every workspace rather than fabricating a plan-gated duplicate of it.
+enum GamePreference {
+  ask
+  always_game
+  always_watch
+  disabled
+}
+
+// Customer = the workspace. One row per signed-up account (still 1:1 with a
+// Clerk user for now — WorkspaceMember below is what will let a workspace
+// have more than one authorized user without changing this identity).
+model Customer {
+  id                String            @id @default(cuid())
+  clerkUserId       String            @unique
+  plan              String            @default("free")
+  maxClientProfiles Int               @default(3)
+  gamePreference    GamePreference    @default(ask)
+  createdAt         DateTime          @default(now())
+  actions           Action[]
+  auditLogEntries   AuditLogEntry[]
+  scanJobs          ScanJob[]
+  pageSnapshots     PageSnapshot[]
+  customerFacts     CustomerFact[]
+  clientProfiles    ClientProfile[]
+  members           WorkspaceMember[]
+  findings          Finding[]
+  generationJobs    GenerationJob[]
+  provenanceRecords ActionProvenance[]
+  researchJobs      ResearchJob[]
+}
+
+enum WorkspaceRole {
+  owner
+  editor
+  reviewer
+}
+
+// Authorizes a Clerk user against a workspace with a role. The workspace
+// creator gets an implicit `owner` row; an agency adds more members here.
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  customerId  String
+  customer    Customer      @relation(fields: [customerId], references: [id])
+  clerkUserId String
+  role        WorkspaceRole @default(owner)
+  createdAt   DateTime      @default(now())
+
+  @@unique([customerId, clerkUserId])
+}
+
+// A managed business/brand within a workspace. A business account gets one
+// default profile; an agency creates one per client.
+model ClientProfile {
+  id                  String    @id @default(cuid())
+  customerId          String
+  customer            Customer  @relation(fields: [customerId], references: [id])
+  name                String
+  businessDescription String?
+  audience            String?
+  markets             String[]  @default([])
+  languages           String[]  @default([])
+  brandVoice          String?
+  approvedClaims      String[]  @default([])
+  restrictedWording   String[]  @default([])
+  // Social-profile-discovery plan (2026-10-17, docs/superpowers/plans/2026-10-17-social-
+  // profile-discovery-plan.md): whole-list replace on write, same semantics as markets/
+  // languages above -- written either by an accepted `socialProfiles` ProfileSuggestion
+  // (scan-discovered) or a direct Settings edit (owner-added/removed), never merged.
+  socialProfiles      Json      @default("[]")
+  // Base entitlement: how many active websites this profile may have without
+  // a paid upgrade. No billing integration yet — bumping this is a manual/
+  // admin action, not a checkout flow (see docs/superpowers/specs on this).
+  maxWebsites         Int       @default(3)
+  isDefault           Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  websites            Website[]
+  contentPieces       ContentPiece[]
+  preferenceCandidates PreferenceCandidate[]
+  preferenceCandidateChecks PreferenceCandidateCheck[]
+  preferenceEvaluations PreferenceEvaluation[]
+  researchJobs         ResearchJob[]
+  competitorEntities   CompetitorEntity[]
+  contentRecommendations ContentRecommendation[]
+  profileSuggestions  ProfileSuggestion[]
+}
+
+enum WebsiteStatus {
+  active
+  archived
+}
+
+// The actual site being audited/scanned. Replaces the single websiteUrl
+// field that used to live on Customer — a client profile can now have more
+// than one, up to its maxWebsites entitlement.
+model Website {
+  id                 String         @id @default(cuid())
+  clientProfileId    String
+  clientProfile      ClientProfile  @relation(fields: [clientProfileId], references: [id])
+  url                String
+  // Host-only, lowercased, no scheme/path/trailing-slash — identity key so
+  // different paths of the same site never count as separate websites.
+  normalizedHost     String
+  status             WebsiteStatus  @default(active)
+  gscRefreshToken    String?
+  // The verified Search Console property, once selected — independent of `url`,
+  // which is always the crawl target.
+  gscPropertyUrl     String?
+  // Set true when a live Google call rejects the stored refresh token itself
+  // (not a client-config or transient failure) — distinct from "no token"
+  // and from "token present, property not yet selected", so Settings can
+  // show the right one of three states without an extra Google call per render.
+  gscReconnectRequired Boolean      @default(false)
+  shopifyShopDomain  String?
+  shopifyAccessToken String?
+  autoExecuteEnabled Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  actions            Action[]
+  scanJobs           ScanJob[]
+  pageSnapshots      PageSnapshot[]
+  findings           Finding[]
+  pageLinks          PageLink[]
+  feedbackAnalysis   FeedbackAnalysis?
+  preferenceCandidates PreferenceCandidate[]
+  preferenceCandidateChecks PreferenceCandidateCheck[]
+  preferenceEvaluations PreferenceEvaluation[]
+  generationJobs     GenerationJob[]
+  provenanceRecords  ActionProvenance[]
+  contentPieces      ContentPiece[]
+  researchJobs       ResearchJob[]
+  contentRecommendations ContentRecommendation[]
+  profileSuggestions ProfileSuggestion[]
+
+  @@unique([clientProfileId, normalizedHost])
+  @@unique([id, clientProfileId])
+}
+
+enum ProfileSuggestionField {
+  businessDescription
+  audience
+  markets
+  languages
+  brandVoice
+  socialProfiles
+}
+
+enum ProfileSuggestionStatus {
+  suggested
+  accepted
+  rejected
+}
+
+model ProfileSuggestion {
+  id              String                  @id @default(cuid())
+  clientProfileId String
+  clientProfile   ClientProfile           @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  websiteId       String
+  website         Website                 @relation(fields: [websiteId, clientProfileId], references: [id, clientProfileId], onDelete: Cascade)
+  field           ProfileSuggestionField
+  valueJson       Json
+  sourceUrl       String
+  sourceExcerpt   String
+  identity        String                  @unique
+  status          ProfileSuggestionStatus @default(suggested)
+  modelVersion    String
+  promptVersion   String
+  createdAt       DateTime                @default(now())
+  decidedAt       DateTime?
+
+  @@index([clientProfileId, status])
+  @@index([websiteId, status])
+}
+
+model FeedbackAnalysis {
+  id                  String    @id @default(cuid())
+  websiteId           String    @unique
+  website             Website   @relation(fields: [websiteId], references: [id])
+  summary             String?
+  sourceEditCount     Int
+  sourceLatestEntryAt DateTime?
+  sourceFingerprint   String?
+  modelVersion        String?
+  promptVersion       String?
+  generatedAt         DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model PreferenceCandidate {
+  id                     String    @id @default(cuid())
+  clientProfileId        String
+  clientProfile          ClientProfile @relation(fields: [clientProfileId], references: [id])
+  websiteId              String
+  website                Website   @relation(fields: [websiteId], references: [id])
+  targetField            String
+  originalProposedPhrase String
+  customerEditedPhrase   String?
+  rationale               String
+  evidenceEntryIds        String[]
+  evidenceExcerpts        Json
+  status                  String
+  supersededById          String?
+  sourceFingerprint       String
+  modelVersion            String
+  promptVersion           String
+  generatedAt             DateTime  @default(now())
+  decidedAt               DateTime?
+  evaluation              PreferenceEvaluation?
+
+  @@index([websiteId, status])
+  @@index([clientProfileId])
+}
+
+model PreferenceCandidateCheck {
+  id              String   @id @default(cuid())
+  clientProfileId String
+  clientProfile   ClientProfile @relation(fields: [clientProfileId], references: [id])
+  websiteId       String
+  website         Website  @relation(fields: [websiteId], references: [id])
+  targetField     String
+  lastFingerprint String
+  lastOutcome     String
+  lastCandidateId String?
+  checkedAt       DateTime @default(now())
+
+  @@unique([websiteId, clientProfileId, targetField])
+}
+
+model PreferenceEvaluation {
+  id               String    @id @default(cuid())
+  candidateId      String    @unique
+  candidate        PreferenceCandidate @relation(fields: [candidateId], references: [id])
+  clientProfileId  String
+  clientProfile    ClientProfile @relation(fields: [clientProfileId], references: [id])
+  websiteId        String
+  website          Website   @relation(fields: [websiteId], references: [id])
+  targetField      String
+  evaluatedPhrase  String
+  excludedActionIds String[]
+  supportingCount  Int       @default(0)
+  counterCount     Int       @default(0)
+  neutralCount     Int       @default(0)
+  status           String
+  decisionRationale String?
+  evaluatorVersion String
+  sourceFingerprint String?
+  limitations      String?
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  activatedAt      DateTime?
+  deactivatedAt    DateTime?
+
+  cases PreferenceEvaluationCase[]
+
+  @@index([websiteId, status])
+}
+
+model PreferenceEvaluationCase {
+  id             String   @id @default(cuid())
+  evaluationId   String
+  evaluation     PreferenceEvaluation @relation(fields: [evaluationId], references: [id])
+  actionId       String
+  classification String
+  evidenceExcerpt Json?
+  createdAt      DateTime @default(now())
+
+  @@unique([evaluationId, actionId])
+  @@index([actionId])
+}
+
+enum ActionStatus {
+  pending
+  approved
+  edited
+  rejected
+}
+
+// Tracks the draft's own generation attempt, independent of the human review
+// decision above (ActionStatus) — a finding can be 'pending' review with
+// generationStatus 'failed' when the underlying issue was found but Dex
+// couldn't draft a fix for it yet.
+enum GenerationStatus {
+  succeeded
+  failed
+}
+
+enum ProofOutcome {
+  pass
+  flag
+  block
+}
+
+enum RiskTier {
+  low
+  medium
+  high
+}
+
+enum ContentPlatform {
+  linkedin
+  instagram
+  facebook
+  x
+  reddit
+  tiktok
+  youtube
+  ugc_brief
+}
+
+enum ContentStatus {
+  draft
+  needs_assets
+  needs_review
+  approved
+  ready_to_publish
+  published
+  failed
+  archived
+}
+
+model ContentPiece {
+  id              String          @id @default(cuid())
+  clientProfileId String
+  clientProfile   ClientProfile   @relation(fields: [clientProfileId], references: [id])
+  platform        ContentPlatform
+  topic           String
+  sourceActionId  String?
+  sourceAction    Action?         @relation(fields: [sourceActionId], references: [id])
+  websiteId       String?
+  website         Website?        @relation(fields: [websiteId], references: [id], onDelete: Restrict)
+  sourceFindingId String?
+  sourceFinding   Finding?        @relation(fields: [sourceFindingId], references: [id], onDelete: SetNull)
+  sourceRecommendationId String?
+  sourceRecommendation   ContentRecommendation? @relation(fields: [sourceRecommendationId], references: [id], onDelete: SetNull)
+  evidence        Json?
+  draftContent    Json
+  status          ContentStatus   @default(draft)
+  tokenCost       Int?
+  failureReason   String?
+  // Resolved at generation time (an explicit override, or the ClientProfile default) and
+  // actually fed into the adapter prompt via buildGroundingBlock — never decorative fields.
+  audience        String?
+  objective       String?
+  market          String?
+  language        String?
+  // Real ProofCheckResult[] (proof-layer.ts) captured at generation time, including a clean
+  // pass — not just the failure summary already in failureReason. Lets the UI show every real
+  // check (disclosure, claims, contradiction, length, duplicates, restricted wording, platform
+  // policy) instead of fabricating a fixed checklist unrelated to what was actually run.
+  proofChecks     Json?
+  createdAt       DateTime        @default(now())
+  decidedAt       DateTime?
+  variants        ContentVariant[]
+
+  @@index([clientProfileId])
+  @@index([sourceActionId])
+  @@index([websiteId])
+  @@index([sourceFindingId])
+  @@index([sourceRecommendationId])
+}
+
+// One row per generated variant (S2: three angles per generation request). Cascades with its
+// parent ContentPiece because a variant has no independent meaning outside the generation that
+// produced it, unlike sourceFinding/website which stay referenced after their own lifecycle.
+model ContentVariant {
+  id             String        @id @default(cuid())
+  contentPieceId String
+  contentPiece   ContentPiece  @relation(fields: [contentPieceId], references: [id], onDelete: Cascade)
+  index          Int
+  angle          String
+  draftContent   Json
+  status         ContentStatus @default(draft)
+  failureReason  String?
+  critique       Json?
+  // Measured usage for this variant's own draft/critique/revision calls only, including a
+  // failed attempt's actual usage where it ran -- never a share of another variant's calls.
+  tokenCost      Int           @default(0)
+  proofChecks    Json?
+  createdAt      DateTime      @default(now())
+
+  @@unique([contentPieceId, index])
+  @@index([contentPieceId])
+}
+
+model Action {
+  id            String       @id @default(cuid())
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  websiteId     String
+  website       Website      @relation(fields: [websiteId], references: [id])
+  pageUrl       String
+  actionType    String
+  currentValue  String?
+  draftContent  String
+  aiDisclosure  Boolean      @default(true)
+  guardResult   GuardResult?
+  status        ActionStatus @default(pending)
+  generationStatus GenerationStatus @default(succeeded)
+  generationError  String?
+  riskTier      RiskTier     @default(low)
+  policyVersion String       @default("v1")
+  tokenCost     Int?
+  createdAt     DateTime     @default(now())
+  decidedAt     DateTime?
+  baselinePerformance Json?
+  baselineCapturedAt  DateTime?
+  outcomePerformance  Json?
+  outcomeMeasuredAt   DateTime?
+  contentPieces ContentPiece[]
+  provenanceRecords ActionProvenance[]
+}
+
+enum ProducerKind {
+  model
+  deterministic
+}
+
+enum FindingAssociationKind {
+  causal
+  input_only
+  unavailable
+}
+
+// docs/superpowers/plans/2026-10-11-action-provenance.md: one append-only row per committed
+// terminal generation result that actually succeeded (the plan's separate failure-record
+// contract is not approved yet, so this table only covers the success path generation-worker.ts
+// already writes an Action+GuardResult for). `actionId` is deliberately not unique -- a retried
+// meta_description job updates the same Action in place, and each such retry gets its own new
+// provenance row with a fresh executionId, same as GenerationJob already allows re-claiming the
+// same targetRef. No uniqueness on (generationJobId, attemptNumber) per the plan -- retry/reaper
+// identity isn't reconciled for that yet.
+model ActionProvenance {
+  id         String   @id @default(cuid())
+  executionId String  @unique
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  websiteId  String
+  website    Website  @relation(fields: [websiteId], references: [id])
+  // Point-in-time snapshot, not a live FK -- the profile may be renamed or reassigned after this
+  // execution ran, and this row must keep describing what was actually true then.
+  clientProfileIdAtExecution String?
+  actionId         String
+  action           Action   @relation(fields: [actionId], references: [id])
+  generationJobId  String
+  attemptNumber    Int
+  actionType       String
+
+  producerKind    ProducerKind
+  producerVersion String
+  provider        String?
+  model           String?
+  requestTemplateVersion String?
+
+  findingAssociation FindingAssociationKind
+  associationReason  String?
+  sourceDescriptor   String?
+
+  enqueueInputsSnapshot   Json
+  enqueueInputsVersion    String
+  generatorInputsSnapshot Json
+  generatorInputsVersion  String
+  validatorInputsSnapshot Json?
+  validatorInputsVersion  String?
+  inputsCapturedAt        DateTime
+  inputsDigest            String
+  inputsDigestFormat      String  @default("sha256-hex")
+
+  checkedBytes          String
+  checkedBytesSha256    String
+  validatorKind         String?
+  validatorVersion      String?
+  checkedAt             DateTime?
+  guardOutcome          ProofOutcome?
+  checksRun             Json?
+  reasoning             String?
+  validationFormatVersion String?
+
+  policySnapshot       Json?
+  policySnapshotVersion String?
+  policyCapturedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  findings ActionProvenanceFinding[]
+
+  @@index([customerId, websiteId, createdAt])
+  @@index([actionId, createdAt])
+  @@index([generationJobId, attemptNumber])
+}
+
+// Join row for an actual causal Finding -- only created when findingAssociation == 'causal'.
+// Fields are copied at write time (ruleId/ruleVersion/agent/pageUrl/evidence/limitations), not
+// read live off Finding later, so this row keeps describing what the producer actually consumed
+// even if the Finding itself is reclassified or re-scanned afterward.
+model ActionProvenanceFinding {
+  id                 String           @id @default(cuid())
+  actionProvenanceId String
+  actionProvenance   ActionProvenance @relation(fields: [actionProvenanceId], references: [id])
+  findingId          String
+  finding            Finding          @relation(fields: [findingId], references: [id])
+  ruleId             String
+  ruleVersion        String
+  agent              String
+  pageUrl            String
+  evidence           Json
+  limitations        String?
+  retrievedAt        DateTime
+  createdAt          DateTime         @default(now())
+
+  @@index([actionProvenanceId])
+  @@index([findingId])
+}
+
+model CustomerFact {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  claim      String
+  category   String
+  createdAt  DateTime @default(now())
+}
+
+model GuardResult {
+  id        String       @id @default(cuid())
+  actionId  String       @unique
+  action    Action       @relation(fields: [actionId], references: [id])
+  outcome   ProofOutcome
+  checksRun Json
+  reasoning String
+}
+
+model AuditLogEntry {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  eventType  String
+  actionId   String?
+  detail     Json
+  createdAt  DateTime @default(now())
+}
+
+// Phase 1C (docs/superpowers/specs/2026-09-28-phase1c-generation-queue-adr.md): one row per
+// real generation attempt for the 6 run-scan.ts actionTypes + retry-draft. Deliberately not
+// fields bolted onto Action -- see the ADR's "Decision" section for why a separate table keeps
+// Action meaning what every existing consumer (review UI, Opportunity Board, evidence export)
+// already assumes it means (a row only exists once generation has already succeeded or failed).
+model GenerationJob {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  websiteId  String
+  website    Website  @relation(fields: [websiteId], references: [id])
+  actionType String
+  targetRef  String
+  // Deterministic hash of (customerId, websiteId, actionType, targetRef, inputFingerprint) --
+  // see the ADR's "Idempotency strategy". Enqueueing is an upsert keyed on this, so a duplicate
+  // submission is a no-op against the same row, never a second job.
+  idempotencyKey String @unique
+  // Every input the claimed generator needs to actually run -- shape varies per actionType
+  // (e.g. meta_description: {url,title,metaDescription,h1}; restricted_wording_fix: {matches};
+  // internal_link_fix: {target,candidates}). Read only by the one generator this job dispatches
+  // to, never interpreted generically.
+  payload Json
+  // queued | running | waiting_retry | rate_limited | blocked | completed | failed | cancelled
+  status        String    @default("queued")
+  attempts      Int       @default(0)
+  nextRetryAt   DateTime?
+  cancelRequested Boolean @default(false)
+  lastError     String?
+  // Set once claimed, so the breaker check and the stale-running reaper both know which
+  // (provider, model) this job's in-flight attempt belongs to without re-deriving it.
+  provider      String?
+  model         String?
+  // The Action row this job's successful completion wrote to, in the same transaction that
+  // marked the job completed -- lets a caller resolve "what did this job actually produce"
+  // without re-deriving it from (websiteId, targetRef, actionType), which isn't always unique
+  // (e.g. a retried meta_description job updates an existing failed Action in place).
+  resultActionId String?
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  completedAt DateTime?
+
+  @@index([status, nextRetryAt])
+}
+
+// Phase 1C: shared circuit breaker for a (provider, model) pair, not per-tenant -- see the ADR's
+// "Persisted circuit breaker" section for why a provider outage is a shared external fact. No
+// tenant-specific data is ever stored here.
+model ProviderCircuitBreaker {
+  id                  String    @id @default(cuid())
+  provider            String
+  model               String
+  consecutiveFailures Int       @default(0)
+  // Null when the breaker is closed. Set to a future time when open; the next eligible job past
+  // this timestamp is the one half-open probe (see the ADR's cooldown-doubling rule).
+  openUntil           DateTime?
+  // Current cooldown duration in ms, doubled on a failed probe (capped at 30 minutes per the
+  // ADR) and reset to the base 5-minute value on a successful probe -- persisted so the doubling
+  // survives across separate serverless invocations.
+  cooldownMs          Int       @default(300000)
+  lastFailureAt       DateTime?
+  lastSuccessAt       DateTime?
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([provider, model])
+}
+
+model ScanJob {
+  id            String         @id @default(cuid())
+  customerId    String
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  websiteId     String
+  website       Website        @relation(fields: [websiteId], references: [id])
+  status        String         @default("queued") // queued | running | completed | failed | cancelled
+  // Set by POST /api/scan/[jobId]/cancel. The running scan loop (run-scan.ts) polls this
+  // itself and stops between pages/drafts rather than the cancel request killing anything
+  // directly -- /api/scan runs inline with no worker to signal, so the DB row is the only
+  // channel between the two separate serverless invocations.
+  cancelRequested Boolean      @default(false)
+  createdAt     DateTime       @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  resultSummary Json?
+  error         String?
+  logLines      ScanLogLine[]
+  findings      Finding[]
+  pageLinks     PageLink[]
+}
+
+model ScanLogLine {
+  id        String   @id @default(cuid())
+  scanJobId String
+  scanJob   ScanJob  @relation(fields: [scanJobId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+}
+
+enum FindingSeverity {
+  low
+  medium
+  high
+}
+
+// A single evidence-linked observation from an audit agent (brief section 5),
+// distinct from Action: a Finding is what the agent observed, an Action is
+// what Dex proposes to do about it. One finding may or may not produce an
+// Action later.
+model Finding {
+  id              String          @id @default(cuid())
+  customerId      String
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  websiteId       String
+  website         Website         @relation(fields: [websiteId], references: [id])
+  scanJobId       String?
+  scanJob         ScanJob?        @relation(fields: [scanJobId], references: [id])
+  pageUrl         String
+  agent           String // 'seo_specialist' (future: 'geo_specialist', 'brand_specialist')
+  ruleId          String // e.g. 'missing_canonical', 'missing_structured_data'
+  ruleVersion     String          @default("v1")
+  severity        FindingSeverity
+  confidence      String // 'high' | 'medium' | 'low' confidence basis, not a numeric score
+  evidence        Json
+  limitations     String?
+  suggestedAction String
+  retrievedAt     DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  // Verified-on-rescan (docs/superpowers/specs/2026-10-17-verified-on-rescan-design.md): all
+  // three nullable, additive only. resolution is a tri-state descriptor, NOT the same as
+  // "resolved" -- could_not_verify sets resolution but leaves resolvedAt/resolvedByScanJobId
+  // null, so the finding still counts as open.
+  resolvedAt          DateTime?
+  resolvedByScanJobId String?
+  resolution          String? // 'fixed' | 'excluded' | 'could_not_verify'
+  provenanceLinks ActionProvenanceFinding[]
+  contentPieces   ContentPiece[]
+
+  @@index([websiteId])
+  @@index([scanJobId])
+  @@index([websiteId, resolvedAt])
+}
+
+model PageSnapshot {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  websiteId   String
+  website     Website  @relation(fields: [websiteId], references: [id])
+  pageUrl     String
+  contentHash String
+  capturedAt  DateTime @default(now())
+
+  @@unique([websiteId, pageUrl])
+}
+
+// Live Site Graph prerequisite -- previously no page-link edges were persisted anywhere in
+// this schema (see dashboard/[websiteId]/page.tsx's honest "unavailable" placeholder). One
+// row per real internal link found on a crawled page, scoped to the scan that found it (same
+// re-created-fresh-each-scan convention as Finding, not deduped/upserted across scans) --
+// derived from the same fetched HTML the SEO Specialist already reads, never a second crawl.
+model PageLink {
+  id         String   @id @default(cuid())
+  websiteId  String
+  website    Website  @relation(fields: [websiteId], references: [id])
+  scanJobId  String?
+  scanJob    ScanJob? @relation(fields: [scanJobId], references: [id])
+  fromUrl    String
+  toUrl      String
+  createdAt  DateTime @default(now())
+
+  @@index([websiteId])
+}
+
+// Phase 2G research intelligence (v1). Parallel job pipeline alongside ScanJob, never merged
+// into it -- see docs/superpowers/plans/2026-10-14-phase2g-research-intelligence-plan.md.
+model ResearchJob {
+  id              String    @id @default(cuid())
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  clientProfileId String
+  clientProfile   ClientProfile @relation(fields: [clientProfileId], references: [id])
+  websiteId       String?
+  website         Website?  @relation(fields: [websiteId], references: [id])
+  status          String    @default("queued") // queued | running | waiting_retry | partial | completed | failed | cancelled
+  stage           String    @default("resolve_identity")
+  cancelRequested Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  resultSummary   Json?
+  error           String?
+  tokenCost       Int       @default(0)
+  // Pinned Agent Reach version string that served this job's web/RSS/YouTube channels
+  // (amendment 1 revision, e2aa89f -- Agent Reach runs in production as a separate Vercel
+  // Python function, never a bare TypeScript scraper).
+  agentReachVersion String?
+  logLines        ResearchLogLine[]
+  evidenceItems   EvidenceItem[]
+  recommendations ContentRecommendation[]
+
+  @@index([clientProfileId])
+  @@index([websiteId])
+}
+
+model ResearchLogLine {
+  id            String      @id @default(cuid())
+  researchJobId String
+  researchJob   ResearchJob @relation(fields: [researchJobId], references: [id])
+  message       String
+  createdAt     DateTime    @default(now())
+
+  @@index([researchJobId])
+}
+
+model EvidenceItem {
+  id                    String      @id @default(cuid())
+  researchJobId         String
+  researchJob           ResearchJob @relation(fields: [researchJobId], references: [id])
+  entityId              String      // CompetitorEntity.id, or the company's own ClientProfile.id for own-site evidence
+  platform              String      // 'competitor_site' | 'google_news_rss' | 'trade_press_rss' | 'own_site' | 'youtube'
+  canonicalUrl          String
+  title                 String?
+  author                String?
+  publishedAt           DateTime?   // null when the source gave no date -- honest "undated"
+  retrievedAt           DateTime    @default(now())
+  excerpt               String      // capped ~500 chars per council amendment 6 (DSGVO minimal-evidence rule)
+  language              String?
+  sourceType            String      // 'news' | 'blog' | 'press_release' | 'product_page' | 'pricing_page' | 'other'
+  observedMetrics       Json?
+  entityMatchConfidence Float       // 0-1, how sure this evidence is actually about `entityId`
+  extractionConfidence  Float       // 0-1, how sure the excerpt accurately reflects the source
+  primarySource         Boolean     @default(false)
+  limitations           String[]    @default([])
+
+  @@index([researchJobId])
+  @@index([canonicalUrl])
+}
+
+model CompetitorEntity {
+  id                   String        @id @default(cuid())
+  clientProfileId      String
+  clientProfile        ClientProfile @relation(fields: [clientProfileId], references: [id])
+  name                 String
+  canonicalDomain      String?
+  classification       String        // 'direct' | 'indirect' | 'adjacent' | 'unknown'
+  classificationReason String
+  source               String        // 'user_added' | 'own_site_mention' | 'news_mention'
+  userConfirmed        Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+
+  @@index([clientProfileId])
+}
+
+model ContentRecommendation {
+  id                          String        @id @default(cuid())
+  researchJobId               String
+  researchJob                 ResearchJob   @relation(fields: [researchJobId], references: [id])
+  clientProfileId             String
+  clientProfile               ClientProfile @relation(fields: [clientProfileId], references: [id])
+  websiteId                   String
+  website                     Website       @relation(fields: [websiteId], references: [id])
+  platform                    String
+  audience                    String
+  topic                       String
+  opportunityType             String
+  whyNow                      String
+  businessRelevance           String
+  companyEvidenceIds          String[]      @default([])
+  externalEvidenceIds         String[]      @default([])
+  competitorEvidenceIds       String[]      @default([])
+  angle                       String
+  claimsAllowed               String[]      @default([])
+  claimsRequiringVerification String[]      @default([])
+  differentiationNote         String?
+  confidenceLabel             String        // 'verified_market_development' | 'repeated_discussion' | 'insufficient_evidence'
+  status                      String        @default("new") // new | dismissed | converted_to_draft
+  createdAt                   DateTime      @default(now())
+  contentPieces               ContentPiece[]
+
+  @@index([clientProfileId, status])
+  @@index([websiteId, status])
+}

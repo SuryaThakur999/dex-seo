@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/cron/measure-outcomes", "schedule": "0 6 * * *" },
+    { "path": "/api/scan/process", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/competitor-watch", "schedule": "0 6 * * 1" },
+    { "path": "/api/cron/weekly-rescan", "schedule": "0 5 * * 1" }
+  ]
+}

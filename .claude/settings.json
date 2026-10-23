@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/surya/Projects/dex-ai/.claude/skill-routing-reminder.sh 2>/dev/null || echo '{}'",
+            "statusMessage": "Checking dex-ai skill routing..."
+          }
+        ]
+      }
+    ]
+  }
+}

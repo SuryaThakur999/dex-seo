@@ -1,0 +1,4 @@
+# Pinned Agent Reach v1.5.0 (amendment 1 revision, e2aa89f -- human-approved production use
+# for login-free research channels only). feedparser and yt-dlp[default] ship as agent-reach's
+# own declared dependencies -- not pinned separately so they stay in lockstep with this commit.
+agent-reach @ git+https://github.com/Panniantong/agent-reach.git@94f06c1969dfc1834001269d79d3ad0972d9dee6

@@ -1,0 +1,212 @@
+<title>Dex Operator Workflow</title>
+<meta name="description" content="How the release pipeline and the in-product autonomy loop actually function, corrected per the approved team model.">
+<style>
+  :root{
+    --bg:#111310; --surface:#181b16; --surface-2:#1f2319; --border:rgba(245,243,238,0.10);
+    --text:#F5F3EE; --text-dim:#9a978c; --accent:#FD4C00; --accent-dim:rgba(253,76,0,0.35);
+    --mint:#3ddc97; --amber:#E8A33D; --danger:#E5484D;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#F7F5F0; --surface:#FFFFFF; --surface-2:#F0EDE5; --border:rgba(20,18,12,0.12);
+      --text:#1C1A15; --text-dim:#6b6858; --accent:#D6440A; --accent-dim:rgba(214,68,10,0.18);
+      --mint:#0f9d63; --amber:#a8690e; --danger:#c0292d;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#111310; --surface:#181b16; --surface-2:#1f2319; --border:rgba(245,243,238,0.10);
+    --text:#F5F3EE; --text-dim:#9a978c; --accent:#FD4C00; --accent-dim:rgba(253,76,0,0.35);
+    --mint:#3ddc97; --amber:#E8A33D; --danger:#E5484D;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:"Sora",system-ui,sans-serif;padding:24px 16px 56px;margin:0}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-family:"Sora",system-ui,sans-serif;font-size:clamp(1.6rem,4vw,2.1rem);font-weight:700;text-wrap:balance;margin:0 0 6px}
+  .sub{color:var(--text-dim);font-size:0.95rem;margin:0 0 36px;max-width:60ch}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+  figure{margin:0 0 48px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 18px 16px}
+  figcaption{font-size:0.85rem;color:var(--text-dim);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+  svg{width:100%;height:auto;display:block;font-family:"IBM Plex Mono",monospace}
+  .node-label{font-size:12px;fill:var(--text)}
+  .node-sub{font-size:9.5px;fill:var(--text-dim)}
+  .edge-label{font-size:9.5px;fill:var(--text-dim)}
+  table{width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:4px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{font-family:"IBM Plex Mono",monospace;font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);font-weight:500}
+  td.mono{font-family:"IBM Plex Mono",monospace;font-size:0.78rem;color:var(--accent)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-dim);margin:10px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .overflow{overflow-x:auto}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<div class="wrap">
+  <p class="eyebrow">Dex — Verified AI Marketing Operator</p>
+  <h1>How the two loops actually run</h1>
+  <p class="sub">Two distinct mechanisms, not one: the release pipeline that ships each slice, and the in-product autonomy loop Dex runs for every customer once shipped. Neither runs continuously in the "always watching" sense — both are triggered, bounded, and stop at a defined gate.</p>
+
+  <figure>
+    <p class="eyebrow">Release pipeline — one slice, start to finish</p>
+    <div class="overflow">
+    <svg viewBox="0 0 880 300" role="img" aria-label="Agent A implements, Agent B reviews and may block sending it back to Agent A for a fix pass, Agent B rechecks only the changed risk surface, the Release Observatory audits review integrity once, then deployment happens.">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g stroke="currentColor" stroke-width="1.2" fill="none">
+        <line x1="70" y1="60" x2="190" y2="60" marker-end="url(#arrow)"/>
+        <line x1="270" y1="60" x2="390" y2="60" marker-end="url(#arrow)"/>
+        <path d="M 390 90 Q 330 150 270 90" marker-end="url(#arrow)" stroke="var(--amber)"/>
+        <line x1="470" y1="60" x2="590" y2="60" marker-end="url(#arrow)"/>
+        <line x1="670" y1="60" x2="790" y2="60" marker-end="url(#arrow)"/>
+      </g>
+      <text x="330" y="128" text-anchor="middle" class="edge-label" fill="var(--amber)">block → fix pass</text>
+      <text x="130" y="48" text-anchor="middle" class="edge-label">commit range</text>
+      <text x="330" y="48" text-anchor="middle" class="edge-label">Review Manifest</text>
+      <text x="530" y="48" text-anchor="middle" class="edge-label">approve</text>
+      <text x="730" y="48" text-anchor="middle" class="edge-label">verdict</text>
+
+      <g>
+        <rect x="10" y="30" width="120" height="60" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+        <text x="70" y="55" text-anchor="middle" class="node-label" font-weight="600">Agent A</text>
+        <text x="70" y="70" text-anchor="middle" class="node-sub">implements the slice</text>
+      </g>
+      <g>
+        <rect x="190" y="30" width="120" height="60" rx="10" fill="var(--surface-2)" stroke="currentColor" stroke-width="1"/>
+        <text x="250" y="55" text-anchor="middle" class="node-label" font-weight="600">Agent B</text>
+        <text x="250" y="70" text-anchor="middle" class="node-sub">reads the real diff, read-only</text>
+      </g>
+      <g>
+        <rect x="390" y="30" width="80" height="60" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1"/>
+        <text x="430" y="55" text-anchor="middle" class="node-label" font-weight="600">Agent A</text>
+        <text x="430" y="70" text-anchor="middle" class="node-sub">fix pass</text>
+      </g>
+      <g>
+        <rect x="590" y="30" width="80" height="60" rx="10" fill="var(--surface-2)" stroke="currentColor" stroke-width="1"/>
+        <text x="630" y="55" text-anchor="middle" class="node-label" font-weight="600">Agent B</text>
+        <text x="630" y="70" text-anchor="middle" class="node-sub">rechecks risk surface</text>
+      </g>
+      <g>
+        <rect x="790" y="10" width="80" height="100" rx="10" fill="var(--surface-2)" stroke="var(--mint)" stroke-width="1.4"/>
+        <text x="830" y="45" text-anchor="middle" class="node-label" font-weight="600">Release</text>
+        <text x="830" y="60" text-anchor="middle" class="node-label" font-weight="600">Observatory</text>
+        <text x="830" y="78" text-anchor="middle" class="node-sub">audits review integrity, once</text>
+      </g>
+
+      <line x1="830" y1="110" x2="830" y2="250" stroke="var(--mint)" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="845" y="185" class="edge-label" fill="var(--mint)">approved</text>
+      <rect x="770" y="250" width="110" height="34" rx="8" fill="none" stroke="var(--mint)" stroke-width="1.2"/>
+      <text x="825" y="272" text-anchor="middle" class="node-label" fill="var(--mint)">deploy once</text>
+
+      <line x1="770" y1="60" x2="600" y2="200" stroke="var(--danger)" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
+      <text x="700" y="150" text-anchor="middle" class="edge-label" fill="var(--danger)">critical/high → blocked</text>
+    </svg>
+    </div>
+    <figcaption>Never all three roles active at once. Agent B and the Observatory are read-only. A block sends the slice back one step, not back to the start — the recheck only re-touches the changed risk surface, never the whole diff again.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="eyebrow">In-product autonomy loop — runs per customer, per opportunity</p>
+    <div class="overflow">
+    <svg viewBox="0 0 880 460" role="img" aria-label="Observe feeds prioritize, prioritize feeds prepare, prepare goes through ProofLayer which either blocks, passes to execution when low risk, or requests one human decision when material risk or policy requires it. Approved or executed work is verified in production, measured, and recorded as controlled learning, which feeds back into prioritization.">
+      <defs>
+        <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g stroke="currentColor" stroke-width="1.2" fill="none">
+        <line x1="150" y1="45" x2="150" y2="95" marker-end="url(#arrow2)"/>
+        <line x1="150" y1="155" x2="150" y2="205" marker-end="url(#arrow2)"/>
+        <line x1="150" y1="265" x2="150" y2="305" marker-end="url(#arrow2)"/>
+      </g>
+      <text x="164" y="75" class="edge-label">real crawl + performance data</text>
+      <text x="164" y="185" class="edge-label">deterministic ranking rules</text>
+      <text x="164" y="290" class="edge-label">draft + evidence assembled</text>
+
+      <rect x="60" y="10" width="180" height="35" rx="8" fill="var(--surface-2)" stroke="currentColor"/>
+      <text x="150" y="32" text-anchor="middle" class="node-label" font-weight="600">Observe</text>
+
+      <rect x="60" y="95" width="180" height="60" rx="10" fill="var(--surface-2)" stroke="currentColor"/>
+      <text x="150" y="120" text-anchor="middle" class="node-label" font-weight="600">Prioritize</text>
+      <text x="150" y="136" text-anchor="middle" class="node-sub">severity · confidence · effort · risk</text>
+
+      <rect x="60" y="205" width="180" height="60" rx="10" fill="var(--surface-2)" stroke="currentColor"/>
+      <text x="150" y="230" text-anchor="middle" class="node-label" font-weight="600">Prepare</text>
+      <text x="150" y="246" text-anchor="middle" class="node-sub">Level 1 — draft only, no mutation</text>
+
+      <rect x="60" y="305" width="180" height="60" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+      <text x="150" y="330" text-anchor="middle" class="node-label" font-weight="600">ProofLayer</text>
+      <text x="150" y="346" text-anchor="middle" class="node-sub">verifies before anything ships</text>
+
+      <line x1="240" y1="320" x2="330" y2="230" stroke="var(--danger)" stroke-width="1.1" marker-end="url(#arrow2)"/>
+      <text x="335" y="222" class="edge-label" fill="var(--danger)">blocked</text>
+      <rect x="330" y="230" width="150" height="42" rx="8" fill="none" stroke="var(--danger)" stroke-width="1.1"/>
+      <text x="405" y="255" text-anchor="middle" class="node-label" fill="var(--danger)">reject / repair, real reason shown</text>
+
+      <line x1="240" y1="345" x2="420" y2="380" stroke="var(--amber)" stroke-width="1.1" marker-end="url(#arrow2)"/>
+      <text x="330" y="405" class="edge-label" fill="var(--amber)">material risk / policy requires it</text>
+      <rect x="420" y="358" width="180" height="44" rx="8" fill="none" stroke="var(--amber)" stroke-width="1.1"/>
+      <text x="510" y="384" text-anchor="middle" class="node-label" fill="var(--amber)">one human decision</text>
+
+      <line x1="240" y1="330" x2="630" y2="330" stroke="var(--mint)" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <text x="435" y="322" text-anchor="middle" class="edge-label" fill="var(--mint)">Level 3 — policy-approved, low risk</text>
+
+      <line x1="510" y1="358" x2="630" y2="345" stroke="var(--mint)" stroke-width="1.1" marker-end="url(#arrow2)"/>
+      <text x="580" y="340" class="edge-label" fill="var(--mint)">approved</text>
+
+      <rect x="630" y="305" width="180" height="60" rx="10" fill="var(--surface-2)" stroke="var(--mint)" stroke-width="1.4"/>
+      <text x="720" y="330" text-anchor="middle" class="node-label" font-weight="600">Execute</text>
+      <text x="720" y="346" text-anchor="middle" class="node-sub">only within explicit policy</text>
+
+      <line x1="720" y1="305" x2="720" y2="45" stroke="currentColor" stroke-width="1.1" marker-end="url(#arrow2)"/>
+      <text x="734" y="180" class="edge-label">refetch live destination</text>
+      <rect x="630" y="10" width="180" height="35" rx="8" fill="var(--surface-2)" stroke="currentColor"/>
+      <text x="720" y="32" text-anchor="middle" class="node-label" font-weight="600">Verify production</text>
+
+      <line x1="720" y1="45" x2="720" y2="95" stroke="currentColor" stroke-width="1.1" marker-end="url(#arrow2)"/>
+      <rect x="630" y="95" width="180" height="45" rx="8" fill="var(--surface-2)" stroke="currentColor"/>
+      <text x="720" y="122" text-anchor="middle" class="node-label" font-weight="600">Measure outcome</text>
+
+      <line x1="630" y1="118" x2="240" y2="118" stroke="currentColor" stroke-width="1" stroke-dasharray="2,4" marker-end="url(#arrow2)"/>
+      <text x="435" y="108" text-anchor="middle" class="edge-label">record controlled learning → back into Prioritize</text>
+
+      <line x1="480" y1="380" x2="330" y2="230" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2,4" marker-end="url(#arrow2)"/>
+      <text x="470" y="300" class="edge-label" fill="var(--danger)">rejected / edited</text>
+    </svg>
+    </div>
+    <figcaption>Same shape as the reference loop, corrected: "policy-approved" only ever means Level 3 (explicit action-type allowlist + tenant scope match + risk within policy + a tested rollback) — never a silent default. Permissions, billing, OAuth scopes and the autonomy policy itself are never touched by this loop, at any level.</figcaption>
+  </figure>
+
+  <figure>
+    <p class="eyebrow">Phase → slice map</p>
+    <div class="overflow">
+    <table>
+      <tr><th>Phase</th><th>Slice</th><th>Delivers</th><th>Blocked on</th></tr>
+      <tr><td class="mono">1A</td><td>Baseline &amp; OAuth taxonomy</td><td>Error-class map, safe-error taxonomy</td><td>—</td></tr>
+      <tr><td class="mono">1B</td><td>Durable jobs</td><td>One vertical durable-job path (scan)</td><td>Queue ADR first</td></tr>
+      <tr><td class="mono">1C</td><td>Generation resilience</td><td>Retry-After, backoff, real circuit breaker</td><td>1B's chosen mechanism</td></tr>
+      <tr><td class="mono">1D</td><td>Evidence identity</td><td>Proof Receipt foundation</td><td>—</td></tr>
+      <tr><td class="mono">1E</td><td>Security gate</td><td>Tenant/SSRF/injection verification</td><td>—</td></tr>
+      <tr><td class="mono">2A</td><td>Journey &amp; IA</td><td>Approved journey, no code</td><td>—</td></tr>
+      <tr><td class="mono">2B</td><td>Work Feed</td><td>Read model over existing events</td><td>—</td></tr>
+      <tr><td class="mono">2C</td><td>Talk to Dex</td><td>Typed allowlisted commands</td><td>—</td></tr>
+      <tr><td class="mono">2D</td><td>Review by exception</td><td>Decision inbox, safe batching</td><td>—</td></tr>
+      <tr><td class="mono">2E</td><td>Responsive/a11y QA</td><td>5 breakpoints, full states</td><td>—</td></tr>
+      <tr><td class="mono">3A</td><td>RBAC foundation</td><td>Server-enforced roles</td><td>Own substantial feature</td></tr>
+      <tr><td class="mono">3B</td><td>Agency portfolio</td><td>Multi-client view</td><td>3A</td></tr>
+      <tr><td class="mono">3C</td><td>Safe batch ops</td><td>Cross-boundary-safe batching</td><td>3A</td></tr>
+      <tr><td class="mono">3D</td><td>Publishing ADR + connector</td><td>One reviewed integration</td><td>Real test destination</td></tr>
+      <tr><td class="mono">3E</td><td>Apply/verify/revert</td><td>Refetch-verified deploy lifecycle</td><td>3D</td></tr>
+      <tr><td class="mono">3F</td><td>Notifications &amp; usage</td><td>Exception-only alerts, real cost data</td><td>—</td></tr>
+    </table>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--accent)"></span>in progress / next</span>
+      <span><span class="dot" style="background:var(--mint)"></span>verified path</span>
+      <span><span class="dot" style="background:var(--amber)"></span>human decision</span>
+      <span><span class="dot" style="background:var(--danger)"></span>blocked / rejected</span>
+    </div>
+  </figure>
+</div>
